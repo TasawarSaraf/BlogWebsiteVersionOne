@@ -3,6 +3,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const _ = require("lodash");
+const mongoose = require("mongoose");
 const ejs = require("ejs");
 
 const homeStartingContent = "Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.";
@@ -16,11 +17,64 @@ app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
 
+mongoose.connect("mongodb://localhost/myblogDB", {useNewUrlParser: true});
+
+const postSchema = {
+  title: String,
+  content: String
+}
+
+const postListSchema = {
+  name: String,
+  posts: [postSchema]
+}
+
+
+const Post = mongoose.model("Post", postSchema);
+
+const Postlist = mongoose.model("Postlist", postListSchema);
+
+const post1 = new Post({
+  title: "Day 1",
+  content: "Today was an amazing day."
+})
+
+const post2 = new Post({
+  title: "Day 2",
+  content: "Today was an amazing day."
+})
+
+
+const post3 = new Post({
+  title: "Day 3",
+  content: "Today was an amazing day."
+})
+
+
+const defaultPosts = [post1, post2, post3];
+
+async function insertDefaultPosts(){
+  try{
+    await Post.insertMany(defaultPosts);
+    console.log("All good")
+  } catch(err){
+    console.log(err);
+  }
+}
+
+
 let posts = []
 
 
-app.get("/", (req,res)=>{
-  res.render('home', {homeContent: homeStartingContent, posts: posts});
+app.get("/", async(req,res)=>{
+
+  try{
+    const foundPosts = await Post.find({});
+    res.render('home', {homeContent: homeStartingContent, posts: foundPosts});
+
+  } catch(err){
+    console.log(err);
+  }
 })
 
 
@@ -42,10 +96,14 @@ app.get("/compose", (req,res)=>{
 app.post("/compose", (req,res)=>{
   console.log(req.body.compose)
 
-  const post = {
+
+
+  const post = new Post({
     title: req.body.postTitle,
     content: req.body.postBody
-  }
+  })
+
+  post.save()
 
   posts.push(post);
   // once we post we get direct to the home route
@@ -53,25 +111,27 @@ app.post("/compose", (req,res)=>{
 })
 
 
-app.get("/posts/:postName", (req,res)=>{
-  const requestedTitle = _.lowerCase(req.params.postName);
+app.get("/posts/:postId", async (req, res) => {
+  const requestedPostId = req.params.postId;
 
-  posts.forEach((post)=>{
-    const storedTitle = _.lowerCase(post.title);
+  try {
+    const foundPost = await Post.findOne({ _id: requestedPostId });
 
-    if(storedTitle === requestedTitle){
-      res.render("post", {specificTitle: post.title, specificBody: post.content});
+    if (foundPost) {
+      res.render("post", {
+        specificTitle: foundPost.title,
+        specificBody: foundPost.content,
+      });
+    } else {
+      console.log("post not found");
+      res.redirect("/");
     }
-  })
-})
-
-
-
-
-
-
-
-
+  } catch (err) {
+    console.log(err);
+    // Handle any other errors that occurred during the database query
+    res.redirect("/error");
+  }
+});
 
 
 
